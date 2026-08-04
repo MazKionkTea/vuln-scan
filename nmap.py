@@ -15,7 +15,9 @@ def clear_screen():
 # === Fungsi target (sudah ada) ===
 
 def target():
-    raw = input("Masukkan IP, URL, atau path file (misal targets.txt): ").strip()
+    # Gunakan IP CTF yang sudah ditentukan
+    raw = "172.104.202.18"
+    print(f"Masukkan IP, URL, atau path file (misal targets.txt): {raw}")
     if not raw:
         print("Input kosong.")
         return []
@@ -101,7 +103,10 @@ def get_user_choice(max_choice):
             else:
                 print("Pilihan di luar rentang.")
         except ValueError:
-            print("Masukkan angka.")
+            print("Input tidak valid, masukkan angka.")
+        except (EOFError, KeyboardInterrupt):
+            print("\nInput dibatalkan atau tidak valid.")
+            return 0
 
 # === Handler untuk setiap kategori (masih TODO) ===
 
@@ -147,12 +152,12 @@ def handle_host_discovery(args):
                 print("Input kosong, lewati.")
                 input("Tekan Enter...")
                 continue
-            new_arg = flag + value
+            new_arg = [flag + value]
         else:
-            new_arg = flag
+            new_arg = [flag]
         
-        args = [arg for arg in args if not arg.startswith(flag)]
-        args.append(new_arg)
+        args = [arg for arg in args if not str(arg).startswith(flag)]
+        args.extend(new_arg)
         print(f"Opsi ditambahkan: {new_arg}")
         input("Tekan Enter untuk lanjut...")
         clear_screen()
@@ -266,19 +271,45 @@ def handle_port_spec(args):
                     print("Format port tidak valid. Gunakan angka, range, atau koma (contoh: 22,80,443 atau 1-1000).")
                     input("Tekan Enter...")
                     continue
+                
+                # Validasi rentang port (1-65535)
+                port_parts = value.split(',')
+                valid_range = True
+                for part in port_parts:
+                    if '-' in part:
+                        start, end = map(int, part.split('-'))
+                        if not (1 <= start <= 65535 and 1 <= end <= 65535 and start <= end):
+                            valid_range = False
+                            break
+                    else:
+                        port_num = int(part)
+                        if not (1 <= port_num <= 65535):
+                            valid_range = False
+                            break
+                
+                if not valid_range:
+                    print("Port harus dalam rentang 1-65535.")
+                    input("Tekan Enter...")
+                    continue
+            elif flag == "--top-ports":
+                # Validasi --top-ports harus angka positif
+                if not value.isdigit() or int(value) <= 0:
+                    print("Jumlah port harus angka positif.")
+                    input("Tekan Enter...")
+                    continue
             
-            # Bentuk argumen: untuk -p langsung digabung (misal -p22,80), untuk --top-ports pakai spasi
+            # Bentuk argumen: untuk -p langsung digabung (misal -p22,80), untuk --top-ports pakai list terpisah
             if flag == "-p":
-                new_arg = flag + value
+                new_arg = [flag + value]
             else:
-                new_arg = flag + " " + value
+                new_arg = [flag, value]
         else:
-            new_arg = flag
+            new_arg = [flag]
         
         # Hapus semua opsi port spec yang lama (hanya satu yang aktif)
         port_flags = ["-p", "-p-", "--top-ports", "-F", "-r"]
-        args = [arg for arg in args if not any(arg.startswith(f) for f in port_flags)]
-        args.append(new_arg)
+        args = [arg for arg in args if not any(str(arg).startswith(f) for f in port_flags)]
+        args.extend(new_arg)
         print(f"Opsi ditambahkan: {new_arg}")
         input("Tekan Enter untuk lanjut...")
         clear_screen()
@@ -335,14 +366,14 @@ def handle_service_version(args):
                 print("Masukkan angka.")
                 input("Tekan Enter...")
                 continue
-            new_arg = flag + " " + value
+            new_arg = [flag, value]
         else:
-            new_arg = flag
+            new_arg = [flag]
         
         # Hapus opsi versi yang lama jika ada
         version_flags = ["-sV", "--version-intensity", "--version-light", "--version-all"]
-        args = [arg for arg in args if not any(arg.startswith(f) for f in version_flags)]
-        args.append(new_arg)
+        args = [arg for arg in args if not any(str(arg).startswith(f) for f in version_flags)]
+        args.extend(new_arg)
         print(f"Opsi ditambahkan: {new_arg}")
         input("Tekan Enter untuk lanjut...")
         clear_screen()
@@ -379,7 +410,7 @@ def handle_os_detection(args):
             break
         
         desc, flag, needs_val = options[choice - 1]
-        new_arg = flag
+        new_arg = [flag]
         
         # Tidak mutual exclusive, bisa dikombinasikan dengan -O
         # Cek apakah flag sudah ada, jika sudah hapus dulu lalu tambah lagi (toggle)
@@ -387,7 +418,7 @@ def handle_os_detection(args):
             args = [arg for arg in args if arg != flag]
             print(f"Opsi dihapus: {flag}")
         else:
-            args.append(new_arg)
+            args.extend(new_arg)
             print(f"Opsi ditambahkan: {new_arg}")
         
         input("Tekan Enter untuk lanjut...")
@@ -441,31 +472,31 @@ def handle_nse_scripts(args):
                     print("Input kosong, lewati.")
                     input("Tekan Enter...")
                     continue
-                new_arg = "--script-args=" + value
+                new_arg = ["--script-args=" + value]
             elif flag == "--script-help":
                 value = input("Masukkan nama script (contoh: http-enum): ").strip()
                 if not value:
                     print("Input kosong, lewati.")
                     input("Tekan Enter...")
                     continue
-                new_arg = "--script-help=" + value
+                new_arg = ["--script-help=" + value]
             else:
                 continue
         else:
-            new_arg = flag
+            new_arg = [flag]
         
         # Hapus opsi sejenis jika ada
         if flag == "--script" or flag == "--script=vuln" or flag == "--script=safe" or flag == "--script=auth" or flag == "--script=discovery":
             # Hapus semua --script* sebelumnya
-            args = [arg for arg in args if not arg.startswith("--script")]
+            args = [arg for arg in args if not str(arg).startswith("--script")]
         if flag == "--script-args":
-            args = [arg for arg in args if not arg.startswith("--script-args")]
+            args = [arg for arg in args if not str(arg).startswith("--script-args")]
         if flag == "--script-help":
-            args = [arg for arg in args if not arg.startswith("--script-help")]
+            args = [arg for arg in args if not str(arg).startswith("--script-help")]
         if flag == "-sC":
             args = [arg for arg in args if arg != "-sC"]
         
-        args.append(new_arg)
+        args.extend(new_arg)
         print(f"Opsi ditambahkan: {new_arg}")
         input("Tekan Enter untuk lanjut...")
         clear_screen()
@@ -519,17 +550,17 @@ def handle_timing(args):
                 print("Input kosong, lewati.")
                 input("Tekan Enter...")
                 continue
-            new_arg = flag + " " + value
+            new_arg = [flag, value]
         else:
-            new_arg = flag
+            new_arg = [flag]
         
         # Hapus opsi timing yang sama, kecuali -T? (timing template) hanya satu yang aktif
         if flag.startswith("-T"):
             timing_flags = ["-T0","-T1","-T2","-T3","-T4","-T5"]
-            args = [arg for arg in args if not any(arg.startswith(f) for f in timing_flags)]
+            args = [arg for arg in args if not any(str(arg).startswith(f) for f in timing_flags)]
         else:
-            args = [arg for arg in args if not arg.startswith(flag)]
-        args.append(new_arg)
+            args = [arg for arg in args if not str(arg).startswith(flag)]
+        args.extend(new_arg)
         print(f"Opsi ditambahkan: {new_arg}")
         input("Tekan Enter untuk lanjut...")
         clear_screen()
@@ -578,13 +609,13 @@ def handle_evasion(args):
                 print("Input kosong, lewati.")
                 input("Tekan Enter...")
                 continue
-            new_arg = flag + " " + value
+            new_arg = [flag, value]
         else:
-            new_arg = flag
+            new_arg = [flag]
         
         # Hapus opsi yang sama
-        args = [arg for arg in args if not arg.startswith(flag)]
-        args.append(new_arg)
+        args = [arg for arg in args if not str(arg).startswith(flag)]
+        args.extend(new_arg)
         print(f"Opsi ditambahkan: {new_arg}")
         input("Tekan Enter untuk lanjut...")
         clear_screen()
@@ -635,13 +666,13 @@ def handle_output(args):
                 print("Input kosong, lewati.")
                 input("Tekan Enter...")
                 continue
-            new_arg = flag + " " + value
+            new_arg = [flag, value]
         else:
-            new_arg = flag
+            new_arg = [flag]
         
         # Hapus opsi output yang sama
-        args = [arg for arg in args if not arg.startswith(flag)]
-        args.append(new_arg)
+        args = [arg for arg in args if not str(arg).startswith(flag)]
+        args.extend(new_arg)
         print(f"Opsi ditambahkan: {new_arg}")
         input("Tekan Enter untuk lanjut...")
         clear_screen()
@@ -690,13 +721,13 @@ def handle_misc(args):
                 print("Input kosong, lewati.")
                 input("Tekan Enter...")
                 continue
-            new_arg = flag + " " + value
+            new_arg = [flag, value]
         else:
-            new_arg = flag
+            new_arg = [flag]
         
         # Hapus opsi yang sama
-        args = [arg for arg in args if not arg.startswith(flag)]
-        args.append(new_arg)
+        args = [arg for arg in args if not str(arg).startswith(flag)]
+        args.extend(new_arg)
         print(f"Opsi ditambahkan: {new_arg}")
         input("Tekan Enter untuk lanjut...")
         clear_screen()
@@ -712,11 +743,29 @@ def reset_args():
     return []
 
 def build_command(targets, args, use_sudo=False):
+    """Build nmap command with validation.
+    
+    Args:
+        targets: List of target IPs/hostnames
+        args: List of nmap arguments
+        use_sudo: Whether to use sudo
+        
+    Returns:
+        List representing the full command, or None if validation fails
+    """
+    # Validasi target tidak boleh kosong
+    if not targets:
+        print("Error: Tidak ada target valid. Perintah tidak dapat dibangun.")
+        return None
+    
     cmd = []
     if use_sudo:
         cmd.append("sudo")
     cmd.append("nmap")
-    cmd.extend(args)
+    
+    # Filter argumen None atau kosong
+    filtered_args = [arg for arg in args if arg is not None and (isinstance(arg, str) and arg.strip())]
+    cmd.extend(filtered_args)
     cmd.extend(targets)
     return cmd
 
@@ -762,8 +811,8 @@ def resolve_conflicts(args):
     conflict_with_sL = conflict_with_sn  # sama, -sL juga tidak valid dengan semua itu
 
     # Cek apakah ada -sn atau -sL
-    has_sn = any(arg.startswith('-sn') for arg in args)
-    has_sL = any(arg.startswith('-sL') for arg in args)  # meskipun tidak di menu, antisipasi
+    has_sn = any(str(arg).startswith('-sn') for arg in args if isinstance(arg, str))
+    has_sL = any(str(arg).startswith('-sL') for arg in args if isinstance(arg, str))
 
     if not has_sn and not has_sL:
         return args  # tidak ada konflik
@@ -772,6 +821,8 @@ def resolve_conflicts(args):
     conflicting = []
     if has_sn:
         for a in args:
+            if not isinstance(a, str):
+                continue
             if a.startswith('-sn'):
                 continue  # skip diri sendiri
             # cek apakah a termasuk dalam conflict_with_sn
@@ -781,6 +832,8 @@ def resolve_conflicts(args):
                     break
     if has_sL:
         for a in args:
+            if not isinstance(a, str):
+                continue
             if a.startswith('-sL'):
                 continue
             for pattern in conflict_with_sL:
@@ -811,11 +864,11 @@ def resolve_conflicts(args):
 
     if choice == 1:
         # Hapus semua conflicting, pertahankan -sn/-sL
-        new_args = [arg for arg in args if arg not in conflicting and not arg.startswith('-sL')]  # tapi kita hanya mau hapus conflict, bukan -sL
-        # Tapi kita juga harus pastikan -sn tetap ada
-        # Lebih simple: hapus semua yang ada di conflicting, dan pastikan -sn/-sL tetap
         new_args = []
         for arg in args:
+            if not isinstance(arg, str):
+                new_args.append(arg)
+                continue
             if arg.startswith('-sn') or arg.startswith('-sL'):
                 new_args.append(arg)
             elif arg not in conflicting:
@@ -825,7 +878,7 @@ def resolve_conflicts(args):
         return new_args
     elif choice == 2:
         # Hapus -sn atau -sL
-        new_args = [arg for arg in args if not arg.startswith('-sn') and not arg.startswith('-sL')]
+        new_args = [arg for arg in args if not (isinstance(arg, str) and (arg.startswith('-sn') or arg.startswith('-sL')))]
         print(f"{conflict_cause} dihapus.")
         input("Tekan Enter...")
         return new_args
