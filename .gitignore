@@ -1,0 +1,31 @@
+```
+# Analysis files
+*_analysis.md
+
+# Environment and temporary files
+.env
+.env.local
+*.tmp
+*.log
+
+# Editor/IDE files
+.vscode/
+.idea/
+*.swp
+*.swo
+
+# System files
+.DS_Store
+Thumbs.db
+
+# Dependencies (if any)
+node_modules/
+venv/
+.venv/
+__pycache__/
+
+# Build artifacts (if any)
+dist/
+build/
+target/
+```
